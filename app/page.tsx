@@ -1,104 +1,196 @@
+import Link from "next/link";
+
 import Navbar from "../components/Navbar";
 import PageTransition from "../components/PageTransition";
-import SearchBar from "../components/SearchBar";
-import { siteConfig } from "../siteConfig";
-import CloudPlayer from "../components/CloudPlayer";
-import ThemeToggleBlock from "../components/ThemeToggleBlock";
-import ProfileCard from "../components/ProfileCard";
-import SiteDashboard from "../components/SiteDashboard";
-import LyricBar from "../components/LyricBar";
 import { ToastProvider } from "../components/ToastProvider";
-import LatestPostsCarousel from "../components/LatestPostsCarousel";
-import { getAllArticles } from "../lib/articles";
+import { siteConfig } from "../siteConfig";
+import { getAllArticles, getArticleTags } from "../lib/articles";
+import { getAllResources } from "../lib/resources";
+import { getAllShuoshuo } from "../lib/shuoshuo";
+import HomeCalendar from "../components/home/HomeCalendar";
+import MiniMusicWidget from "../components/home/MiniMusicWidget";
 
 export default function Home() {
-  const allPosts = getAllArticles();
-  const topPosts =
-    allPosts.length > 0
-      ? allPosts.slice(0, 5)
-      : [
-          {
-            slug: "none",
-            title: "还没有新的文章",
-            description: "下一篇正在路上，首页结构已经为它留好了位置。",
-            cover: siteConfig.defaultPostCover,
-            date: "",
-            formattedDate: "",
-            tags: [],
-            category: "",
-            draft: false,
-          },
-        ];
+  const articles = getAllArticles();
+  const resources = getAllResources();
+  const shuoshuo = getAllShuoshuo();
+  const tags = getArticleTags(articles).slice(0, 10);
+  const categoryMap = new Map<string, number>();
+
+  articles.forEach((article) => {
+    if (!article.category) return;
+    categoryMap.set(article.category, (categoryMap.get(article.category) || 0) + 1);
+  });
+
+  const categories = Array.from(categoryMap.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const totalWords = articles.reduce((sum, article) => sum + (article.description?.length || 0), 0);
+  const recentActivities = [
+    ...articles.slice(0, 4).map((article) => ({ type: "文章", title: article.title, date: article.formattedDate, href: `/articles/${article.slug}` })),
+    ...shuoshuo.slice(0, 3).map((item) => ({ type: "说说", title: item.content, date: item.formattedDate, href: "/shuoshuo" })),
+  ]
+    .sort((a, b) => new Date(b.date.replace(/\./g, "/")).getTime() - new Date(a.date.replace(/\./g, "/")).getTime())
+    .slice(0, 6);
 
   return (
     <ToastProvider>
       <div className="shell-page min-h-screen pb-12">
         <Navbar />
         <PageTransition>
-          <div className="relative z-10 mx-auto mt-24 w-[min(1160px,calc(100%-24px))] sm:mt-28 lg:mt-32">
-            <section className="mb-8 px-1 sm:mb-10">
-              <div className="section-kicker">
-                <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
-                Personal Blog
-              </div>
-              <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr,0.8fr] lg:items-end">
-                <div>
-                  <h1 className="max-w-4xl text-4xl font-black leading-tight text-slate-900 dark:text-white sm:text-5xl lg:text-6xl">
-                    给个人博客留一点呼吸感，也把内容留在真正好读的位置。
-                  </h1>
-                  <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300 sm:text-[15px]">
-                    首页现在已经接到新的文章系统，公开文章统一从 `/articles` 进入，教程型内容也会在文章详情页里得到更完整的阅读结构。
+          <main className="relative z-10 mx-auto mt-24 w-[min(1280px,calc(100%-24px))] sm:mt-28">
+            <div className="grid gap-6 xl:grid-cols-[290px,minmax(0,1fr),300px]">
+              <aside className="space-y-5 xl:sticky xl:top-28 xl:self-start">
+                <section className="glass-panel-strong overflow-hidden p-5">
+                  <div className="flex items-start gap-4">
+                    <img src={siteConfig.avatarUrl} alt={siteConfig.authorName} className="h-20 w-20 rounded-[24px] object-cover shadow-sm" />
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--accent-deep)] dark:text-[var(--accent-soft)]">Profile</div>
+                      <h1 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{siteConfig.authorName}</h1>
+                      <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">{siteConfig.bio}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {[
+                      { label: "GitHub", href: siteConfig.social?.github },
+                      { label: "Gitee", href: siteConfig.social?.gitee },
+                      { label: "邮箱", href: siteConfig.social?.google },
+                    ].map((item) => (
+                      <a key={item.label} href={item.href} target="_blank" rel="noopener noreferrer" className="rounded-full border border-white/50 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="glass-panel-strong p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">Notice</div>
+                  <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-white">公告</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">
+                    这里会慢慢堆积文章、资源和日常记录。首页不再用大 Hero，而是回到更适合个人博客长期阅读的三栏结构。
                   </p>
-                </div>
-                <div className="glass-panel rounded-[28px] p-5">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                    This week
+                  <Link href="/about" className="mt-4 inline-flex rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white shadow-[0_16px_30px_rgba(214,107,77,0.24)]">
+                    了解更多
+                  </Link>
+                </section>
+
+                <section className="glass-panel-strong p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">Tags</div>
+                  <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-white">标签</h3>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <span key={tag.name} className="rounded-full border border-white/50 bg-white/70 px-3 py-1.5 text-sm text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                        #{tag.name}
+                      </span>
+                    ))}
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <HeroMetric value={allPosts.length} label="公开文章" />
-                    <HeroMetric value={topPosts.filter((post) => post.slug !== "none").length} label="首页推荐" />
+                </section>
+
+                <section className="glass-panel-strong p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">Categories</div>
+                  <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-white">分类</h3>
+                  <div className="mt-4 space-y-2">
+                    {categories.map((category) => (
+                      <div key={category.name} className="flex items-center justify-between rounded-[18px] border border-white/45 bg-white/60 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{category.name}</span>
+                        <span className="rounded-full bg-[rgba(214,107,77,0.12)] px-3 py-1 text-xs font-bold text-[var(--accent-deep)] dark:text-[var(--accent-soft)]">{category.count}</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </div>
-            </section>
+                </section>
+              </aside>
 
-            <SearchBar posts={allPosts} />
+              <section className="min-w-0 space-y-5">
+                <section className="glass-panel-strong p-5 sm:p-6">
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">Latest Articles</div>
+                      <h2 className="mt-2 text-3xl font-black text-slate-900 dark:text-white">最新文章</h2>
+                    </div>
+                    <Link href="/articles" className="rounded-full border border-white/50 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                      查看全部
+                    </Link>
+                  </div>
+                </section>
 
-            <main className="flex flex-col gap-5 sm:gap-6">
-              <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
-                <div className="lg:col-span-7">
-                  <ProfileCard postCount={allPosts.length} />
+                <div className="space-y-4">
+                  {articles.slice(0, 8).map((article) => (
+                    <article key={article.slug} className="glass-panel-strong overflow-hidden p-4 sm:p-5">
+                      <div className="grid gap-4 md:grid-cols-[200px,minmax(0,1fr)]">
+                        <Link href={`/articles/${article.slug}`} className="block overflow-hidden rounded-[24px] bg-white/70">
+                          <img src={article.cover} alt={article.title} className="h-full min-h-[150px] w-full object-cover transition duration-300 hover:scale-105" />
+                        </Link>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400 dark:text-slate-500">
+                            <span>{article.formattedDate}</span>
+                            {article.category ? <span>· {article.category}</span> : null}
+                            <span>· {article.tags.length} 个标签</span>
+                          </div>
+                          <Link href={`/articles/${article.slug}`} className="mt-2 block text-2xl font-black leading-tight text-slate-900 dark:text-white">
+                            {article.title}
+                          </Link>
+                          <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">{article.description}</p>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {article.tags.slice(0, 4).map((tag) => (
+                              <span key={tag} className="rounded-full bg-[rgba(214,107,77,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent-deep)] dark:text-[var(--accent-soft)]">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-                <div className="lg:col-span-5">
-                  <CloudPlayer />
-                </div>
-              </div>
+              </section>
 
-              <LyricBar />
+              <aside className="space-y-5 xl:sticky xl:top-28 xl:self-start">
+                <section className="glass-panel-strong p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">Stats</div>
+                  <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-white">站点统计</h3>
+                  <div className="mt-4 space-y-3">
+                    <StatRow label="文章" value={articles.length} />
+                    <StatRow label="分类" value={categories.length} />
+                    <StatRow label="标签" value={tags.length} />
+                    <StatRow label="资源" value={resources.length} />
+                    <StatRow label="说说" value={shuoshuo.length} />
+                    <StatRow label="摘要字数" value={totalWords} />
+                  </div>
+                </section>
 
-              <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
-                <div className="lg:col-span-8">
-                  <LatestPostsCarousel posts={topPosts} />
-                </div>
-                <div className="lg:col-span-4">
-                  <ThemeToggleBlock />
-                </div>
-              </div>
+                <HomeCalendar />
 
-              <SiteDashboard />
-            </main>
-          </div>
+                <section className="glass-panel-strong p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">Recent Activity</div>
+                  <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-white">最近活动</h3>
+                  <div className="mt-4 space-y-3">
+                    {recentActivities.map((item, index) => (
+                      <Link key={`${item.type}-${index}`} href={item.href} className="block rounded-[18px] border border-white/45 bg-white/60 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                        <div className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--accent-deep)] dark:text-[var(--accent-soft)]">{item.type}</div>
+                        <div className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-800 dark:text-slate-100">{item.title}</div>
+                        <div className="mt-2 text-xs text-slate-400 dark:text-slate-500">{item.date}</div>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+
+                <MiniMusicWidget />
+              </aside>
+            </div>
+          </main>
         </PageTransition>
       </div>
     </ToastProvider>
   );
 }
 
-function HeroMetric({ value, label }: { value: number; label: string }) {
+function StatRow({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-[22px] border border-white/45 bg-white/58 px-4 py-4 dark:border-white/10 dark:bg-white/5">
-      <div className="text-2xl font-black text-slate-900 dark:text-white">{value}</div>
-      <div className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">{label}</div>
+    <div className="flex items-center justify-between rounded-[18px] border border-white/45 bg-white/60 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+      <span className="text-sm text-slate-600 dark:text-slate-300">{label}</span>
+      <span className="text-sm font-black text-slate-900 dark:text-white">{value}</span>
     </div>
   );
 }
